@@ -1,27 +1,40 @@
 (ns test.rpn
   (:require [clojure.string :as s]))
 
-(def funcs { "sin" [1 #(Math/sin %)] "cos" [1 #(Math/cos %)] "max" [2 #(max % %2)] })
+(def funcs
+  "Map of functions to add to the evaluator,
+  keys of the map are the function names and 
+  values are vectors where the first entry is the arity 
+  and the second is the function to call"
+  { "sin" [1 #(Math/sin %)] "cos" [1 #(Math/cos %)] "max" [2 #(max % %2)] })
 
 (def oprs {"+" + "-" - "*" * "/" / "%" mod})
 
-(def regexes {:num #"\d+"
+(def regexes
+  "Contains regexes used by the matcher to separate the input string into a sequence of tokens"
+  {:num #"\d+"
               :wrd #"\p{L}+"
               :opr (re-pattern (str "[" (s/join "|" (map #(if (= % "-") "\\-" %) (keys oprs))) "]"))
               :par #"[\(\)]"
               :func (re-pattern (s/join "|" (keys funcs)))})
 
-(def mre (re-pattern (s/join "|" (vals regexes))))
+(def mre
+  "Combined regex for matching any token"
+  (re-pattern (s/join "|" (vals regexes))))
 
 (defn is-op? [v]
+  "Check if <v> is an operator token"
   (re-matches (regexes :opr) v))
 
-(def precedences (merge
-                  {"+" 1 "-" 1 "*" 2 "/" 2 "%" 3 "(" 0}
-                  (reduce-kv (fn [m k v] (assoc m k 4)) {} funcs)))
+(def precedences
+  "Map of precedences for operators"
+  (merge
+   {"+" 1 "-" 1 "*" 2 "/" 2 "%" 3 "(" 0}
+   (reduce-kv (fn [m k v] (assoc m k 4)) {} funcs)))
 
 (defn shunt
-  "Convert a list of tokens <inp> from infix to postfix order"
+  "Convert a list of tokens <inp> from infix to postfix order.
+  Uses <opr> as operator stack, and <out> as a qeueue for building the result"
   [inp opr out]
   ;; (println inp opr out)
   (let [inp-empty? (empty? inp)
