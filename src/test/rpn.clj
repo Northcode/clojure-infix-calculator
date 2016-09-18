@@ -6,17 +6,24 @@
   keys of the map are the function names and 
   values are vectors where the first entry is the arity 
   and the second is the function to call"
-  { "sin" [1 #(Math/sin %)] "cos" [1 #(Math/cos %)] "max" [2 #(max % %2)] })
+  {
+   "sin" [1 #(Math/sin %)]
+   "cos" [1 #(Math/cos %)]
+   "max" [2 #(max % %2)]
+   "acos" [1 #(Math/acos %)]
+   })
 
 (def oprs {"+" + "-" - "*" * "/" / "%" mod})
 
 (def regexes
   "Contains regexes used by the matcher to separate the input string into a sequence of tokens"
   {:num #"\d+"
-              :wrd #"\p{L}+"
-              :opr (re-pattern (str "[" (s/join "|" (map #(if (= % "-") "\\-" %) (keys oprs))) "]"))
-              :par #"[\(\)]"
-              :func (re-pattern (s/join "|" (keys funcs)))})
+   :wrd #"\p{L}+"
+   :opr (re-pattern (str "[" (s/join "|" (map #(if (= % "-") "\\-" %) (keys oprs))) "]"))
+   :par #"[\(\)]"
+   :func (re-pattern (s/join "|" (keys funcs)))})
+
+(regexes :opr)
 
 (def mre
   "Combined regex for matching any token"
@@ -35,8 +42,12 @@
 (defn shunt
   "Convert a list of tokens <inp> from infix to postfix order.
   Uses <opr> as operator stack, and <out> as a qeueue for building the result"
-  [inp opr out]
+  ([inp] (shunt inp [] []))
+  ([inp opr] (shunt inp opr []))
+  ([inp opr out]
+
   ;; (println inp opr out)
+
   (let [inp-empty? (empty? inp)
         opr-empty? (empty? opr)
         tok (first inp)
@@ -92,38 +103,39 @@
       
       :else
       (recur (rest inp) opr (conj out tok))
-      )))
+      ))))
       
 (defn evalExpr
   "Evaluate a postfix expression <expr> using <acc> as the accumulator stack"
-  [expr acc]
-  (let [
-        tok (first expr)
-        tok-str? (and tok (string? tok))
-        tok-op? (and tok-str? (delay (is-op? tok)))
-        tok-func? (and tok-str? (re-matches (regexes :func) tok))
-        opr (first acc)
-        ]
-    ;; (println expr acc tok opr)
-    (cond
-      (empty? expr)
-      (first acc)
-      tok-func?
-      (let [f (get-in funcs [tok 1])
-            fa (get-in funcs [tok 0])
-            args (reverse (take-last fa acc))
-            ]
-        (recur (rest expr) (conj (drop fa acc) (apply f args))))
-      tok-op?
-      (recur (rest expr) (conj (drop-last 2 acc) (apply (oprs tok) (reverse (take-last 2 acc)))))
-      :else
-      (recur (rest expr) (conj acc tok))
-      ))) 
+  ([expr] (evalExpr expr []))
+  ([expr acc]
+   (let [
+         tok (first expr)
+         tok-str? (and tok (string? tok))
+         tok-op? (and tok-str? (delay (is-op? tok)))
+         tok-func? (and tok-str? (re-matches (regexes :func) tok))
+         opr (first acc)
+         ]
+     ;; (println expr acc tok opr)
+     (cond
+       (empty? expr)
+       (first acc)
+       tok-func?
+       (let [f (get-in funcs [tok 1])
+             fa (get-in funcs [tok 0])
+             args (reverse (take-last fa acc))
+             ]
+         (recur (rest expr) (conj (drop fa acc) (apply f args))))
+       tok-op?
+       (recur (rest expr) (conj (drop-last 2 acc) (apply (oprs tok) (reverse (take-last 2 acc)))))
+       :else
+       (recur (rest expr) (conj acc tok))
+       ))))
 
 (defn solve [input]
   (let [toks (re-seq mre input)
-        rpn (shunt toks [] [])
-        result (evalExpr rpn [])]
+        rpn (shunt toks)
+        result (evalExpr rpn)]
     result))
 
 (defn input-loop []
